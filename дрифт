@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Браузерный Дрифт</title>
+    <style>
+        body {
+            margin: 0;
+            background: #222;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: Arial, sans-serif;
+            color: white;
+        }
+        canvas {
+            background: #333;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">Управление: Стрелки / WASD. Зажми поворот на скорости для дрифта!</div>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        // Настройки машины с физикой дрифта
+        const car = {
+            x: 400,
+            y: 300,
+            vx: 0, // Скорость по X
+            vy: 0, // Скорость по Y
+            speed: 0,
+            angle: 0, // Направление кузова
+            moveAngle: 0, // Направление движения (куда летит машина)
+            maxSpeed: 7,
+            accel: 0.15,
+            friction: 0.05,
+            driftFriction: 0.96, // Сила бокового скольжения (чем ближе к 1, тем сильнее занос)
+            turnSpeed: 0.05
+        };
+
+        const keys = {};
+
+        window.addEventListener("keydown", e => keys[e.key] = true);
+        window.addEventListener("keyup", e => keys[e.key] = false);
+
+        function update() {
+            // Управление газом и тормозом
+            if (keys["ArrowUp"] || keys["w"]) {
+                car.speed = Math.min(car.speed + car.accel, car.maxSpeed);
+            } else if (keys["ArrowDown"] || keys["s"]) {
+                car.speed = Math.max(car.speed - car.accel, -car.maxSpeed / 2);
+            } else {
+                car.speed *= (1 - car.friction); // Плавное замедление
+            }
+
+            // Повороты руля
+            if (keys["ArrowLeft"] || keys["a"]) car.angle -= car.turnSpeed;
+            if (keys["ArrowRight"] || keys["d"]) car.angle += car.turnSpeed;
+
+            // Расчет идеального вектора движения (куда смотрят колеса)
+            let forwardX = Math.cos(car.angle) * car.speed;
+            let forwardY = Math.sin(car.angle) * car.speed;
+
+            // Физика дрифта: смешиваем текущую траекторию движения с направлением колес
+            // driftFriction отвечает за то, как сильно машину "несет" боком
+            car.vx = car.vx * car.driftFriction + forwardX * (1 - car.driftFriction);
+            car.vy = car.vy * car.driftFriction + forwardY * (1 - car.driftFriction);
+
+            // Движение машины
+            car.x += car.vx;
+            car.y += car.vy;
+
+            // Ограничение границами экрана (чтобы не улететь)
+            if (car.x < 0) car.x = canvas.width;
+            if (car.x > canvas.width) car.x = 0;
+            if (car.y < 0) car.y = canvas.height;
+            if (car.y > canvas.height) car.y = 0;
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Рисуем сетку на асфальте для ощущения скорости
+            ctx.strokeStyle = "#444";
+            for(let i=0; i<canvas.width; i+=40) {
+                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke();
+            }
+
+            // Отрисовка машины
+            ctx.save();
+            ctx.translate(car.x, car.y);
+            ctx.rotate(car.angle);
+
+            // Кузов машины (красный прямоугольник)
+            ctx.fillStyle = "#ff4444";
+            ctx.fillRect(-20, -10, 40, 20);
+
+            // Фары (чтобы понимать где перед)
+            ctx.fillStyle = "#ffff00";
+            ctx.fillRect(15, -8, 5, 4);
+            ctx.fillRect(15, 4, 5, 4);
+
+            ctx.restore();
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        gameLoop();
+    </script>
+</body>
+</html>
